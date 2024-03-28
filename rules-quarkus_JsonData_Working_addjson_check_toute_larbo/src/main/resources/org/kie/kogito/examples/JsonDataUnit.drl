@@ -1,0 +1,21 @@
+package org.kie.kogito.examples;
+//Unit definition
+unit JsonDataUnit;
+
+rule "Check Reference"
+when
+  $p: /datas[reference == "Test"];
+then
+  $p.setNbRulesCompleted($p.getNbRulesCompleted()+1);
+end 
+
+rule "Check ID80"
+when
+  $p: /datas[id == 8080];
+then
+  $p.setNbRulesCompleted($p.getNbRulesCompleted()+1);
+end 
+
+query "executerules"
+  $p: /datas;
+end

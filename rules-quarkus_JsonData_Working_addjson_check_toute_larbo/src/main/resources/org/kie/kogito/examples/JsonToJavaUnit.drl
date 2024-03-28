@@ -1,0 +1,126 @@
+package org.kie.kogito.examples;
+
+unit JsonToJavaUnit;
+
+import org.kie.kogito.examples.JsonToJavaUnit;
+import org.drools.ruleunits.api.DataSource;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+query "addjson"
+  $j : /jsonstr ; 
+end
+
+rule "Conversion Json String vers Liste"
+when
+  $j: /jsonstr;
+  /jsonstr[received == false];
+then
+  $j.MapJson($j.getJson());
+  $j.setReceived(true);
+  $j.getMaclassedynamique() ; 
+end
+
+rule "Vérification de la présence du système primaire"
+when
+  $j: /jsonstr[proceed == false]  // Assurez-vous que received est vrai avant de vérifier la liste
+  $system: Map(this["PartName"] == "Système essai") from $j.getMaclassedynamique()
+then
+  $j.setProceed(true);
+end
+
+rule "Vérification sur tous les éléments"
+when
+  $j: /jsonstr
+  $component: Map() from $j.getMaclassedynamique()
+  eval(checkFor($component, "LogisticStatus", "Off"));
+then
+  $j.setRegleOff(returnID($component,"LogisticStatus", "Off"));
+  $j.setRegleParent(returnParentChild($component, "LogisticStatus", "LogisticStatus", "Off", "Off"));
+end
+
+function List<String> returnParentChild(Map component, String champsPere, String champsFils, String valeurPere, String valeurFils) {
+  List<String> pairs = new ArrayList<String>();
+
+  // Vérifions d'abord si le composant actuel correspond au critère du père
+  if (valeurPere.equals(component.get(champsPere))) { 
+
+    // Si oui, récupérons la liste des enfants du composant
+    List<Map> children = (List<Map>) component.get("Components");
+    if (children != null) {     
+      for (Map child : children) {
+        // Pour chaque enfant, vérifions s'il correspond au critère du fils
+        if (valeurFils.equals(child.get(champsFils))) {
+          // Si oui, construisons la paire parent-enfant et ajoutons-la à la liste
+          String pair = "P: " + component.get("Number") + ", F: " + child.get("Number");
+          pairs.add(pair);
+        }
+      }
+    }
+  }
+
+  // Parcours récursif des champs pour traiter tous les composants
+  List<Map> children = (List<Map>) component.get("Components");
+  if (children != null) {
+    for (Map child : children) {
+      pairs.addAll(returnParentChild(child, champsPere, champsFils, valeurPere, valeurFils));
+    }
+  }
+
+  System.out.println("Fin de la vérification pour le composant : " + component.get("PartName"));
+  System.out.println("Pairs trouvées : " + pairs);
+
+  return pairs;
+}
+
+
+
+
+
+
+
+
+function List<String> returnID(Map component, String champs, String valeur) {
+  List<String> maliste = new ArrayList<String>();
+  if (valeur.equals(component.get(champs))) {
+    maliste.add((String) component.get("Number"));
+  }
+  for (Object entryObj : component.entrySet()) {
+    if (entryObj instanceof Map.Entry) {
+      Map.Entry entry = (Map.Entry) entryObj;
+      if (entry.getValue() instanceof Map) {
+        maliste.addAll(returnID((Map) entry.getValue(), champs, valeur));
+      } else if (entry.getValue() instanceof List) {
+        for (Object item : (List) entry.getValue()) {
+          if (item instanceof Map) {
+            maliste.addAll(returnID((Map) item, champs, valeur));
+          }
+        }
+      }
+    }
+  }
+  return maliste;
+}
+
+function boolean checkFor(Map component, String champs, String valeur) {
+  for (Object entryObj : component.entrySet()) {
+    Map.Entry entry = (Map.Entry) entryObj;
+    if (champs.equals(entry.getKey()) && valeur.equals(entry.getValue())) {
+      return true;
+    } else if (entry.getValue() instanceof Map) {
+      if (checkFor((Map) entry.getValue(), champs, valeur)) {
+        return true;
+      }
+    } else if (entry.getValue() instanceof List) {
+      for (Object item : (List) entry.getValue()) {
+        if (item instanceof Map && checkFor((Map) item, champs, valeur)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
